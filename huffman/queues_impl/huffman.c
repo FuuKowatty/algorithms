@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "lib/c-map.h"
+#include "c-map.h"
 
 typedef struct Node
 {

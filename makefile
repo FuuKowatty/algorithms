@@ -1,12 +1,21 @@
-run: huffman.o cMap.o string.o
-	gcc huffman.o cMap.o string.o -o huffman -lws2_32
-	./huffman.exe
+CC = gcc
+CFLAGS = -Wall -Wextra -I./lib
+LDFLAGS =
 
-huffman.o: huffman.c ./lib/c-map.h ./lib/c-string.h
-	gcc -c huffman.c -o huffman.o
+.PHONY: clean
+
+huffman_q: huffman_q.o cMap.o string.o
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+	./huffman_q.exe
+
+huffman_q.o: ./huffman/queues_impl/huffman.c ./lib/c-map.h ./lib/c-string.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 cMap.o: ./lib/c-map.c ./lib/c-map.h ./lib/c-string.h
-	gcc -c ./lib/c-map.c -o cMap.o
+	$(CC) $(CFLAGS) -c $< -o $@
 
 string.o: ./lib/c-string.c ./lib/c-string.h
-	gcc -c ./lib/c-string.c -o string.o
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f huffman_q.o cMap.o string.o
