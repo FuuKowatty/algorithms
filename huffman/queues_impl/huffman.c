@@ -1,55 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "c-map.h"
-
-typedef struct Node
-{
-    struct Node** childrens;
-    string* codeName;
-    char letter;
-    int count;
-} Node;
-
-typedef struct NodeWrapper
-{
-    Node* nodes;
-    int size;
-    int currentSize;
-} NodeWrapper;
-
-typedef struct NodeQueue 
-{
-    Node** nodes;
-    int head;
-    int tail;
-    int size;
-    int currentSize;
-} NodeQueue;
-
-void initChilds(Node* nodes, int size) {
-    for (int i = 0; i < size; i++) {
-        nodes[i].childrens = NULL;
-    }
-}
-
-void addLetter(NodeWrapper* wrapper, char letter) {
-    if (wrapper->size == wrapper->currentSize) {
-        wrapper->nodes = (Node*) realloc(wrapper->nodes, sizeof(Node) * wrapper->size * 2);
-    }
-    wrapper->currentSize += 1;
-    Node* node = &wrapper->nodes[wrapper->currentSize-1];
-    node->count = 1;
-    node->letter = letter;
-    node->codeName = NULL;
-    node->childrens = NULL;
-}
- 
-void incrementLetter(NodeWrapper* wrapper, int letterIndex) {
-    Node* node = &wrapper->nodes[letterIndex];
-    node->count += 1;
+#include "node.h"
+#include "node-queue.h"
 
 
-}
+// CONSTS
+const size_t NODE_INITIAL_SIZE = 10;
+const char EMPTY_LETTER = '[';
 
 int compareNodes(const void *a, const void *b) {
     const Node* arg1 = (const Node*)a;
@@ -57,62 +15,82 @@ int compareNodes(const void *a, const void *b) {
     return (arg1->count - arg2->count);
 }
 
-const int NODE_INITIAL_SIZE = 10;
-const char EMPTY_LETTER = '[';
 
-Node** initItems(int size, int sizeToRecopy, Node* nodes) {
-    Node** items = (Node**) malloc(size * sizeof(Node*));
-    for (int i = 0; i < sizeToRecopy; i++) {
-        items[i] = &nodes[i];
-        nodes[i].childrens = NULL;
-        nodes[i].codeName = NULL;
+// WRAPPER
+typedef struct NodeWrapper
+{
+    Node* nodes;
+    size_t size;
+    size_t currentSize;
+} NodeWrapper;
+
+NodeWrapper* initWrapper(Node* nodes) {
+    NodeWrapper* wrapper = (NodeWrapper*) malloc(sizeof(NodeWrapper));
+    wrapper->size=NODE_INITIAL_SIZE;
+    wrapper->currentSize = 0;
+    wrapper->nodes = nodes;
+    return wrapper;
+}
+
+void ensureWrapperSize(NodeWrapper* wrapper) {
+    if (wrapper->size == wrapper->currentSize) {
+        size_t newSize = wrapper->size * 2;
+        Node* temp = reallocNodes(wrapper->nodes, newSize);
+        if (temp != NULL) {
+            wrapper->nodes = temp;
+            wrapper->size = newSize;
+        }
     }
-    return items;
 }
 
-NodeQueue* initQueue(int size, int currentNodesSize, Node* nodes) {
-    int startSize = size * 2;
-    NodeQueue* q = (NodeQueue*) malloc(sizeof(NodeQueue));
-    q->nodes = initItems(startSize, currentNodesSize, nodes);
-    q->head = 0;
-    q->tail = currentNodesSize;
-    q->currentSize = currentNodesSize;
-    q->size = startSize;
-    return q;
+void addLetter(NodeWrapper* wrapper, char letter) {
+    ensureWrapperSize(wrapper);
+    wrapper->currentSize += 1;
+    Node* node = &wrapper->nodes[wrapper->currentSize-1];
+    node->count = 1;
+    node->letter = letter;
+    node->codeName = NULL;
+    node->childrens = NULL;
 }
 
-typedef struct Tuple {
-    Node* left;
-    Node* right;
-} Tuple;
+void incrementLetter(NodeWrapper* wrapper, int letterIndex) {
+    Node* node = &wrapper->nodes[letterIndex];
+    node->count += 1;
+}
 
+NodeWrapper* countLetters(char* text) {
+    IntMap* letterToIndex = newIntMap(99, 0.75);
+    Node* nodes = initNodes(NODE_INITIAL_SIZE);
+    NodeWrapper* wrapper = initWrapper(nodes);
+    for (int i=0; text[i] != '\0'; i++) {
+        int key = (int) text[i];
+        int letterIndex = intMapGet(letterToIndex, key);
+        if (letterIndex == -1) {
+            char letter = text[i];
+            addLetter(wrapper, letter);
+            intMapInsert(letterToIndex, key, wrapper->currentSize-1);
+        } else {
+            incrementLetter(wrapper, letterIndex);
+        }
+    }
+    return wrapper;
+}
+ 
+
+// HUFFMAN
 Node* popMinimalFreqElement(NodeQueue* q1, NodeQueue* q2) {
     if (q2->currentSize == 0) {
-        q1->currentSize--;
-        return q1->nodes[q1->head++];
+        return popQueue(q1);
     }
     if (q1->currentSize == 0) {
-        q2->currentSize--;
-        return q2->nodes[q2->head++];
+        return popQueue(q2);
     } 
-    Node* n1 = q1->nodes[q1->head];
-    Node* n2 = q2->nodes[q2->head];
+    Node* n1 = peekQueue(q1);
+    Node* n2 = peekQueue(q2);
     if (n1->count < n2->count) {
-        q1->currentSize--;
-        q1->head++;
-        return n1;
+        return popQueue(q1);
     }
-    q2->currentSize--;
-    q2->head++;
-    return n2;
-}
-
-Node* popQueue(NodeQueue* q) {
-    if (q->size == 0) {
-        return NULL;
-    }
-    q->currentSize--;
-    return q->nodes[q->head++];
+    return popQueue(q2);
 }
 
 void concatCode(Node* e, string* codeName) {
@@ -150,24 +128,8 @@ Node* createNode(Node* e1, Node* e2) {
     return newNode;
 }
 
-void pushQueue(NodeQueue* q, Node* e) {
-    if (q->tail == q->size) {
-        Node** items = (Node**) malloc(q->size * 2 * sizeof(Node*));
-        for (int i = 0; i < q->size; i++) {
-            items[i] = q->nodes[i];
-        }
-        free(q->nodes);
-        q->nodes = items;
-        q->size *= 2;
-    }
-    q->nodes[q->tail++] = e;
-    q->currentSize++;
-}
-
 void processCodes(NodeQueue* q, IntToStringMap* dictionaryCodes) {
-    // printf("%c\n", q->nodes[q->head]->childrens[1]->childrens[0]->childrens[1]->childrens[1]->childrens[0]->letter); d
-    // printf("%c\n", q->nodes[q->head]->childrens[1]->childrens[0]->childrens[1]->childrens[1]->childrens[1]->childrens[0]->letter); t
-    q->nodes[q->head]->codeName=NULL;
+    peekQueue(q)->codeName = NULL;
     while (q->currentSize != 0)
     {   
         Node* e = popQueue(q);
@@ -190,7 +152,7 @@ void processCodes(NodeQueue* q, IntToStringMap* dictionaryCodes) {
 
 IntToStringMap* getCodesDictionary(NodeWrapper* wrapper) {
     NodeQueue* q1 = initQueue(wrapper->size, wrapper->currentSize, wrapper->nodes);
-    Node* emptyItems = (Node*) malloc(NODE_INITIAL_SIZE * sizeof(Node));
+    Node* emptyItems = initNodes(NODE_INITIAL_SIZE);
     NodeQueue* q2 = initQueue(NODE_INITIAL_SIZE, NODE_INITIAL_SIZE, emptyItems);
     q2->tail = 0;
     q2->currentSize = 0;
@@ -263,41 +225,10 @@ char* decode(IntToStringMap* codeDictionary, char* code) {
 }
 
 int main() {
-    //1
-    // uzywam counts long counts[256] = {0};
-    // licze liczbe wystapien counts[(unsigned char)buffer[i]]++
-    // potem zamieniam na LinkedList
-
-    //2 Dynamiczna lista ale do ostatniej fazy tworze 2 kolejki (tylko nwm czy wczesniejsze etapy da sie lepiej)
-    // 1. kolejka z posortowanymi wartościami
-    // 2. kolejka z nowymi node'ami. Wtedy porównuje head 1 i head 2 kolejki i biore minValue, tak samo minValue2 biore
-
-
-
     char* originallText = "siema tu siema i robi sie dobra siema";
-    IntMap* letterToIndex = newIntMap(99, 0.75);
-    Node* nodes = (Node*) malloc(NODE_INITIAL_SIZE * sizeof(Node));
-    NodeWrapper* wrapper = (NodeWrapper*) malloc(sizeof(NodeWrapper));
-    wrapper->size=NODE_INITIAL_SIZE;
-    wrapper->currentSize = 0;
-    wrapper->nodes = nodes;
-    for (int i=0; originallText[i] != '\0'; i++) {
-        int key = (int) originallText[i];
-        int letterIndex = intMapGet(letterToIndex, key);
-        if (letterIndex == -1) {
-            char letter = originallText[i];
-            addLetter(wrapper, letter);
-            intMapInsert(letterToIndex, key, wrapper->currentSize-1);
-        } else {
-            incrementLetter(wrapper, letterIndex);
-        }
-    }
-    qsort(wrapper->nodes, wrapper->currentSize, sizeof(Node), compareNodes);
+    NodeWrapper* wrapper = countLetters(originallText);
 
-    // do tej operacji LInkedList jest lepsze ale nie będę mógł sortować efektownie i mapa będzie usseles więc:
-    // 1. LinkedLista/kolejka i jakoś wydajnie dodawać elementy (co increment musiałbym szukac całą liste a będzie ich dużo więc słabe chyba)
-    // 2. Zwykła lista dynamiczna ale sortowanie co stworzenie nowego node'a długie ?? 
-    // jak efektywnie dodawać w środku nowy element dla dynamicznej listy.
+    qsort(wrapper->nodes, wrapper->currentSize, sizeof(Node), compareNodes);
 
     IntToStringMap* codeDictionary = getCodesDictionary(wrapper);
     string* code = getCode(originallText, codeDictionary);
@@ -306,5 +237,4 @@ int main() {
     printf("After decoding %s", text);
     freeIntToStringMap(codeDictionary);
     free(wrapper);
-
 };
