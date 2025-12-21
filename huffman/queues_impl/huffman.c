@@ -45,12 +45,12 @@ void ensureWrapperSize(NodeWrapper* wrapper) {
 
 void addLetter(NodeWrapper* wrapper, char letter) {
     ensureWrapperSize(wrapper);
+    Node* node = &wrapper->nodes[wrapper->currentSize];
     wrapper->currentSize += 1;
-    Node* node = &wrapper->nodes[wrapper->currentSize-1];
     node->count = 1;
     node->letter = letter;
     node->codeName = NULL;
-    node->childrens = NULL;
+    node->children = NULL;
 }
 
 void incrementLetter(NodeWrapper* wrapper, int letterIndex) {
@@ -73,6 +73,7 @@ NodeWrapper* countLetters(char* text) {
             incrementLetter(wrapper, letterIndex);
         }
     }
+    freeIntMap(letterToIndex);
     return wrapper;
 }
  
@@ -99,7 +100,7 @@ void concatCode(Node* e, string* codeName) {
     if (previousCode) {
         newCode = concat(codeName, previousCode);
     } else {
-        newCode = codeName;
+        newCode = copyString(codeName);
     }
     free(previousCode);
     e->codeName = newCode;
@@ -115,15 +116,15 @@ void updateCode(Node* e, char* s) {
 }
 
 Node* createNode(Node* e1, Node* e2) {
-    Node** childrens = (Node**) malloc(2 * sizeof(Node*));
+    Node** children = (Node**) malloc(2 * sizeof(Node*));
     updateCode(e1, "0");
     updateCode(e2, "1");
-    childrens[0] = e1;
-    childrens[1] = e2;
+    children[0] = e1;
+    children[1] = e2;
     Node* newNode = (Node*) malloc(sizeof(Node));
     newNode->count=e1->count + e2->count;
     newNode->letter = EMPTY_LETTER;
-    newNode->childrens = childrens;
+    newNode->children = children;
     newNode->codeName = NULL;
     return newNode;
 }
@@ -134,20 +135,52 @@ void processCodes(NodeQueue* q, IntToStringMap* dictionaryCodes) {
     {   
         Node* e = popQueue(q);
         if (e->codeName == NULL) { 
-            pushQueue(q, e->childrens[0]);
-            pushQueue(q, e->childrens[1]);
+            pushQueue(q, e->children[0]);
+            pushQueue(q, e->children[1]);
             continue;
         }
         string* codeName = e->codeName;
-        if (e->childrens != NULL) {
-            concatCode(e->childrens[0], codeName);
-            concatCode(e->childrens[1], codeName);
-            pushQueue(q, e->childrens[0]);
-            pushQueue(q, e->childrens[1]);
+        if (e->children != NULL) {
+            concatCode(e->children[0], codeName);
+            concatCode(e->children[1], codeName);
+            pushQueue(q, e->children[0]);
+            pushQueue(q, e->children[1]);
             continue;
         }
         IntToStringMapInsert(dictionaryCodes, e->letter, e->codeName); 
     }
+}
+
+
+
+// cant clean random index of wrapper->nodes which are leafs
+void clearHuffmanNode(Node* node) {
+    if (node->children != NULL) {
+        clearNode(node->children[0]);
+        clearNode(node->children[1]);
+        free(node->children);
+        freeString(node->codeName);
+        free(node);
+    }
+}
+
+void clearHuffmanQueue(NodeQueue* q) {
+    for (int i = 0; i < q->currentSize; i++) {
+        clearHuffmanNode(q->nodes[i]);
+    }   
+    free(q->nodes);
+    free(q);
+}
+
+void freeWrapper(NodeWrapper* wrapper) {
+    for (int i = 0; i < wrapper->currentSize; i++) {
+        Node* node = (&wrapper->nodes[i]);
+        if (node->codeName) {
+            freeString(node->codeName);
+        }
+    }
+    free(wrapper->nodes);
+    free(wrapper);
 }
 
 IntToStringMap* getCodesDictionary(NodeWrapper* wrapper) {
@@ -169,6 +202,8 @@ IntToStringMap* getCodesDictionary(NodeWrapper* wrapper) {
     }
     IntToStringMap* dictionaryCodes = newIntToStringMap(99, 0.75);
     processCodes(q2, dictionaryCodes);
+    free(q1);
+    clearHuffmanQueue(q2);
     return dictionaryCodes;
 }
 
@@ -177,8 +212,7 @@ string* getCode(char* text, IntToStringMap* codeDictionary) {
     for (int i = 0; text[i] != '\0'; i++) {
         string* letterCode = IntToStringMapGet(codeDictionary, (int) text[i]);
         string* temp = concat(code, letterCode);
-        free(code->str);
-        free(code);
+        freeString(code);
         code = temp;
     }
     return code;
@@ -204,24 +238,26 @@ char* decode(IntToStringMap* codeDictionary, char* code) {
         string* temp1 = newString(temp_buf);
         string* temp2 = potentialCode;
         potentialCode = concat(temp2, temp1);
-        free(temp1);
-        free(temp2);        
+        freeString(temp1);
+        freeString(temp2);        
         int potentialLetter = StringToIntMapGet(invertedMap, potentialCode);
         if (potentialLetter != -1) {
             string* temp4 = decoded;
             char temp_buff2[2] = {(char) potentialLetter, '\0'};
             string* temp5 = newString(temp_buff2);
             decoded = concat(temp4, temp5);
-            free(temp4);
-            free(temp5);
+            freeString(temp4);
+            freeString(temp5);
             string* temp3 = potentialCode;
             potentialCode = newString("");
-            free(temp3);
+            freeString(temp3);
         }
     }
     free(potentialCode);
     freeStringToIntMap(invertedMap);
-    return decoded->str;
+    char* decodedStr = decoded->str;
+    free(decoded);
+    return decodedStr;
 }
 
 int main() {
@@ -235,6 +271,9 @@ int main() {
 
     char* text = decode(codeDictionary, code->str);
     printf("After decoding %s", text);
+
+    freeString(code);
     freeIntToStringMap(codeDictionary);
-    free(wrapper);
+    freeWrapper(wrapper);
+    free(text);
 };

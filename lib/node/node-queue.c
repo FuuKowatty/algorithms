@@ -21,7 +21,7 @@ Node** initItems(size_t size, size_t sizeToRecopy, Node* nodes) {
     Node** items = (Node**) malloc(size * sizeof(Node*));
     for (int i = 0; i < sizeToRecopy; i++) {
         items[i] = &nodes[i];
-        nodes[i].childrens = NULL;
+        nodes[i].children = NULL;
         nodes[i].codeName = NULL;
     }
     return items;
@@ -50,4 +50,12 @@ void pushQueue(NodeQueue* q, Node* e) {
     }
     q->nodes[q->tail++] = e;
     q->currentSize++;
+}
+
+void freeQueue(NodeQueue* q) {
+    for (int i = 0; i < q->currentSize; i++) { // size?
+        clearNode(q->nodes[i]);
+    }   
+    free(q->nodes);
+    free(q);
 }

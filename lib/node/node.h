@@ -4,7 +4,7 @@
 
 typedef struct Node
 {
-    struct Node** childrens;
+    struct Node** children;
     string* codeName;
     char letter;
     size_t count;
@@ -12,3 +12,4 @@ typedef struct Node
 
 Node* reallocNodes(Node* nodes, size_t newSize);
 Node* initNodes(size_t);
+void clearNode(Node* nodes);

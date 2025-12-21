@@ -15,3 +15,4 @@ NodeQueue* initQueue(size_t size, size_t currentNodesSize, Node* nodes);
 Node* popQueue(NodeQueue* q);
 Node* peekQueue(NodeQueue* q);
 void pushQueue(NodeQueue* q, Node* e);
+void freeQueue(NodeQueue* q);
