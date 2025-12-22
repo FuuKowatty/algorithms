@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "c-map.h"
+#include <string.h>
 #include "node.h"
 #include "node-queue.h"
 
 
 // CONSTS
+#define POTENTIAL_CODE_MAX 31
 const size_t NODE_INITIAL_SIZE = 10;
 const char EMPTY_LETTER = '[';
 
@@ -229,37 +231,39 @@ StringToIntMap* invertMap(IntToStringMap* dict) {
     return newMap;
 }
 
+string* cleanString(string* code) {
+    free(code);
+    return newString("");
+}
+
 char* decode(StringToIntMap* codeDictionary, char* code) {
-    string* decoded = newString("");
-    string* potentialCode = newString("");
-    for (size_t i = 0; code[i] != '\0'; i++) {
-        char temp_buf[2] = {code[i], '\0'};
-        string* temp1 = newString(temp_buf);
-        string* temp2 = potentialCode;
-        potentialCode = concat(temp2, temp1);
-        freeString(temp1);
-        freeString(temp2);
-        int potentialLetter = StringToIntMapGet(codeDictionary, potentialCode);
-        if (potentialLetter != -1) {
-            string* temp4 = decoded;
-            char temp_buff2[2] = {(char) potentialLetter, '\0'};
-            string* temp5 = newString(temp_buff2);
-            decoded = concat(temp4, temp5);
-            freeString(temp4);
-            freeString(temp5);
-            string* temp3 = potentialCode;
-            potentialCode = newString("");
-            freeString(temp3);
+    size_t codeLen = strlen(code);
+    char* decoded = malloc(codeLen + 1);
+    size_t decodedIdx = 0;
+    char potentialCode[POTENTIAL_CODE_MAX];
+    size_t potentialLen = 0;
+    for (size_t i = 0; i < codeLen; i++) {
+        potentialCode[potentialLen] = code[i];
+        potentialCode[potentialLen+1] = '\0';
+        potentialLen++;
+        int potentiallyUncoded = StringToIntMapGetRaw(codeDictionary, potentialCode);
+        if (potentiallyUncoded != -1) {
+            decoded[decodedIdx] = potentiallyUncoded;
+            decodedIdx++;
+            potentialCode[0] = '\0';
+            potentialLen = 0;
+        }
+        if (potentialLen >= POTENTIAL_CODE_MAX) {
+            printf("ERROR: EXCEED POTENTIAL_CODE_MAX");
+            return decoded;
         }
     }
-    free(potentialCode);
-    char* decodedStr = decoded->str;
-    free(decoded);
-    return decodedStr;
+    decoded[decodedIdx] = '\0';
+    return decoded;
 }
 
 int main() {
-    char* originallText = "siema tu siema i robi sie dobra siema";
+    char* originallText = "dupa";
     NodeWrapper* wrapper = countLetters(originallText);
 
     qsort(wrapper->nodes, wrapper->currentSize, sizeof(Node), compareNodes);

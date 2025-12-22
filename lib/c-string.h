@@ -34,4 +34,6 @@ int isSubstring(string *str, string *sub);
 
 string **split(string *str, const char delimeter, size_t *count);
 
+int compareChar(string *str1, char *str2);
+
 #endif

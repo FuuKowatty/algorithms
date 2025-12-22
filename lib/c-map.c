@@ -8,6 +8,14 @@ size_t hashFunction(int key, size_t size) {
     return key % size;
 }
 
+int charToInt(char* str) {
+    int result = 0;
+    while (*str != '\0') {
+        result = result * 31 + (int) *str++;
+    }
+    return result;
+}
+
 int stringToInt(string *str) {
     int result = 0;
     for (size_t i = 0; i < str->length; i++) {
@@ -251,6 +259,23 @@ void intMapInsert(IntMap *map, int key, int value) {
     map->entries[index].value = value;
     map->entries[index].isOccupied = 1;
     map->count++;
+}
+
+
+int StringToIntMapGetRaw(StringToIntMap *map, char *key) {
+    size_t hash = hashFunction(charToInt(key), map->size);
+    size_t attempt = 0;
+
+    size_t index = quadraticProbe(hash, attempt, map->size);
+    while (map->entries[index].isOccupied) {
+        if (compareChar(map->entries[index].key, key) == 1) {
+            return map->entries[index].value;
+        }
+        attempt++;
+        index = quadraticProbe(hash, attempt, map->size);
+    }
+
+    return -1;
 }
 
 int StringToIntMapGet(StringToIntMap *map, string *key) {

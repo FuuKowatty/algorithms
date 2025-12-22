@@ -193,6 +193,15 @@ string *extract(string *str, size_t start, size_t end) {
     return newStr;
 }
 
+int compareChar(string *str1, char *str2) {
+    for (size_t i = 0; i < str1->length; i++) {
+        if (str2[i] == '\0' || str1->str[i] != str2[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 int compare(string *str1, string *str2) {
     if (str1->length != str2->length) {
         return 0;

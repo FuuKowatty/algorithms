@@ -85,4 +85,6 @@ int intMapGet(IntMap *map, int key);
 
 void intMapDelete(IntMap *map, int key);
 
+int StringToIntMapGetRaw(StringToIntMap *map, char *key);
+
 #endif

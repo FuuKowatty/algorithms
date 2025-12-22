@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -I./lib -I./lib/node
+CFLAGS = -g -Wall -Wextra -I./lib -I./lib/node
 LDFLAGS =
 
 .PHONY: clean
