@@ -19,7 +19,7 @@ Node* popQueue(NodeQueue* q) {
 
 Node** initItems(size_t size, size_t sizeToRecopy, Node* nodes) {
     Node** items = (Node**) malloc(size * sizeof(Node*));
-    for (int i = 0; i < sizeToRecopy; i++) {
+    for (size_t i = 0; i < sizeToRecopy; i++) {
         items[i] = &nodes[i];
         nodes[i].children = NULL;
         nodes[i].codeName = NULL;
@@ -41,7 +41,7 @@ NodeQueue* initQueue(size_t size, size_t currentNodesSize, Node* nodes) {
 void pushQueue(NodeQueue* q, Node* e) {
     if (q->tail == q->size) {
         Node** items = (Node**) malloc(q->size * 2 * sizeof(Node*));
-        for (int i = 0; i < q->size; i++) {
+        for (size_t i = 0; i < q->size; i++) {
             items[i] = q->nodes[i];
         }
         free(q->nodes);
@@ -53,9 +53,9 @@ void pushQueue(NodeQueue* q, Node* e) {
 }
 
 void freeQueue(NodeQueue* q) {
-    for (int i = 0; i < q->currentSize; i++) { // size?
+    for (size_t i = 0; i < q->size; i++) {
         clearNode(q->nodes[i]);
-    }   
+    }
     free(q->nodes);
     free(q);
 }

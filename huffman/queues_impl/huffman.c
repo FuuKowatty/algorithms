@@ -165,7 +165,7 @@ void clearHuffmanNode(Node* node) {
 }
 
 void clearHuffmanQueue(NodeQueue* q) {
-    for (int i = 0; i < q->currentSize; i++) {
+    for (size_t i = 0; i < q->currentSize; i++) {
         clearHuffmanNode(q->nodes[i]);
     }   
     free(q->nodes);
@@ -173,7 +173,7 @@ void clearHuffmanQueue(NodeQueue* q) {
 }
 
 void freeWrapper(NodeWrapper* wrapper) {
-    for (int i = 0; i < wrapper->currentSize; i++) {
+    for (size_t i = 0; i < wrapper->currentSize; i++) {
         Node* node = (&wrapper->nodes[i]);
         if (node->codeName) {
             freeString(node->codeName);
@@ -220,7 +220,7 @@ string* getCode(char* text, IntToStringMap* codeDictionary) {
 
 StringToIntMap* invertMap(IntToStringMap* dict) {
     StringToIntMap* newMap = newStringToIntMap(dict->size, 1);
-    for (int i = 0; i < dict->size; i++) {
+    for (size_t i = 0; i < dict->size; i++) {
         IntToStringMapEntry entry = dict->entries[i];
         if (entry.isOccupied) {
             StringToIntMapInsert(newMap, entry.value, entry.key);
@@ -229,18 +229,17 @@ StringToIntMap* invertMap(IntToStringMap* dict) {
     return newMap;
 }
 
-char* decode(IntToStringMap* codeDictionary, char* code) {
+char* decode(StringToIntMap* codeDictionary, char* code) {
     string* decoded = newString("");
-    StringToIntMap* invertedMap = invertMap(codeDictionary);
     string* potentialCode = newString("");
-    for (int i = 0; code[i] != '\0'; i++) {
+    for (size_t i = 0; code[i] != '\0'; i++) {
         char temp_buf[2] = {code[i], '\0'};
         string* temp1 = newString(temp_buf);
         string* temp2 = potentialCode;
         potentialCode = concat(temp2, temp1);
         freeString(temp1);
-        freeString(temp2);        
-        int potentialLetter = StringToIntMapGet(invertedMap, potentialCode);
+        freeString(temp2);
+        int potentialLetter = StringToIntMapGet(codeDictionary, potentialCode);
         if (potentialLetter != -1) {
             string* temp4 = decoded;
             char temp_buff2[2] = {(char) potentialLetter, '\0'};
@@ -254,7 +253,6 @@ char* decode(IntToStringMap* codeDictionary, char* code) {
         }
     }
     free(potentialCode);
-    freeStringToIntMap(invertedMap);
     char* decodedStr = decoded->str;
     free(decoded);
     return decodedStr;
@@ -269,7 +267,10 @@ int main() {
     IntToStringMap* codeDictionary = getCodesDictionary(wrapper);
     string* code = getCode(originallText, codeDictionary);
 
-    char* text = decode(codeDictionary, code->str);
+    StringToIntMap* invertedMap = invertMap(codeDictionary);
+    char* text = decode(invertedMap, code->str);
+    freeStringToIntMap(invertedMap);
+    
     printf("After decoding %s", text);
 
     freeString(code);
@@ -277,3 +278,8 @@ int main() {
     freeWrapper(wrapper);
     free(text);
 };
+
+// decode() refaktor
+// notatki z tego co mam + jak czyscimy pointery (ze wskazujemy zawsze na 1 adres bo robi -16 zeby odczytac metadane)
+// operacje na plikach
+// implementacja z LinkedList
