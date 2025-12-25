@@ -8,6 +8,8 @@
 
 // CONSTS
 #define POTENTIAL_CODE_MAX 31
+const char* FILENAME_TO_COMPRESS = "dupa.txt";
+const char* COMPRESSED_FILENAME = "newFIle";
 const size_t NODE_INITIAL_SIZE = 10;
 const char EMPTY_LETTER = '[';
 
@@ -153,8 +155,6 @@ void processCodes(NodeQueue* q, IntToStringMap* dictionaryCodes) {
     }
 }
 
-
-
 // cant clean random index of wrapper->nodes which are leafs
 void clearHuffmanNode(Node* node) {
     if (node->children != NULL) {
@@ -262,28 +262,82 @@ char* decode(StringToIntMap* codeDictionary, char* code) {
     return decoded;
 }
 
+size_t readFile(const char* filename, char* bufor) {
+    FILE* file = fopen(filename, "rb");
+    if (file != NULL) {
+        size_t bufor_idx = 0;
+        do
+        {
+            char c = fgetc(file);
+            if (feof(file)) break;
+            bufor[bufor_idx++] = c;
+        } while(1);
+        fclose(file);   
+        return bufor_idx;
+    }
+    return 0;
+}
+
+size_t roundUp(size_t length) {
+    return (length + 7) / 8;
+}
+
+void writeFile(const char* filename, string* content) {
+    FILE* newFile = fopen(filename, "wb");
+    if (newFile != NULL) {
+        size_t codeLength = content->length; 
+        size_t roundedLength = roundUp(codeLength);
+        char* codeInBytes = calloc(roundedLength, 1);
+        for (size_t i = 0; i < codeLength; i++) {
+            if (content->str[i] == '1') {
+                codeInBytes[i / 8] |= 1 << (7 - (i % 8));
+            }
+        }
+        fwrite(codeInBytes, sizeof(char), roundedLength, newFile);
+        fclose(newFile);
+    }
+}
+
+char* readByBits(const char* compressedFileContent, size_t contentLength, size_t charMaxSize) {
+    char* decompressed = (char*) malloc(charMaxSize * sizeof(char));
+    size_t decompressedSize = 0;
+    for (size_t i = 0; i < contentLength;  i++) {
+        for (size_t j = 0; j < 8; j++) {
+           decompressed[decompressedSize++] = '0' + ((compressedFileContent[i] >> (7-j)) & 1); 
+        }
+    }
+    decompressed[decompressedSize] = '\0';
+    return decompressed;
+}
+
 int main() {
-    char* originallText = "dupa";
-    NodeWrapper* wrapper = countLetters(originallText);
+    // STEP 1 compression
+    char fileContent[4096]; // change it to count length
+    size_t contentLength = readFile(FILENAME_TO_COMPRESS, fileContent);
+    NodeWrapper* wrapper = countLetters(fileContent);
 
     qsort(wrapper->nodes, wrapper->currentSize, sizeof(Node), compareNodes);
 
     IntToStringMap* codeDictionary = getCodesDictionary(wrapper);
-    string* code = getCode(originallText, codeDictionary);
+    string* code = getCode(fileContent, codeDictionary);
+
+    writeFile(COMPRESSED_FILENAME, code);
+    // STEP 2 DECOMPRESSION
+    char compressedFileContent[4096];
+    size_t ile = readFile(COMPRESSED_FILENAME, compressedFileContent);
+    char* decompressedCode = readByBits(compressedFileContent, contentLength, 4096);
+    decompressedCode[code->length] = '\0';
 
     StringToIntMap* invertedMap = invertMap(codeDictionary);
-    char* text = decode(invertedMap, code->str);
+    char* text = decode(invertedMap, decompressedCode);
     freeStringToIntMap(invertedMap);
-    
-    printf("After decoding %s", text);
 
     freeString(code);
+    free(decompressedCode);
     freeIntToStringMap(codeDictionary);
     freeWrapper(wrapper);
     free(text);
 };
 
-// decode() refaktor
 // notatki z tego co mam + jak czyscimy pointery (ze wskazujemy zawsze na 1 adres bo robi -16 zeby odczytac metadane)
-// operacje na plikach
 // implementacja z LinkedList
