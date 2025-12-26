@@ -1,6 +1,21 @@
 #include "c-string.h"
 #include <stdlib.h>
 
+string* newEmptyStringWithFixedLength(size_t fixedSize) {
+    string *newStr = (string*) malloc(sizeof(string));
+    if (newStr == NULL) {
+        return NULL;
+    }
+    newStr->length = fixedSize;
+    newStr->str = (char*) malloc((newStr->length + 1) * sizeof(char));
+    if (newStr->str == NULL) {
+        free(newStr);
+        return NULL;
+    }
+    newStr->str[newStr->length] = '\0';
+    return newStr;
+}
+
 string *newString(const char *staticString) {
     string *newStr = (string*) malloc(sizeof(string));
     if (newStr == NULL) {

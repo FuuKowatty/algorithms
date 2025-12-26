@@ -9,7 +9,7 @@
 // CONSTS
 #define POTENTIAL_CODE_MAX 31
 const char* FILENAME_TO_COMPRESS = "file.txt";
-const char* COMPRESSED_FILENAME = "newFIle";
+const char* COMPRESSED_FILENAME = "compressed";
 const size_t NODE_INITIAL_SIZE = 10;
 const char EMPTY_LETTER = '[';
 
@@ -62,16 +62,15 @@ void incrementLetter(NodeWrapper* wrapper, int letterIndex) {
     node->count += 1;
 }
 
-NodeWrapper* countLetters(char* text) {
+NodeWrapper* countLetters(string* text) {
     IntMap* letterToIndex = newIntMap(99, 0.75);
     Node* nodes = initNodes(NODE_INITIAL_SIZE);
     NodeWrapper* wrapper = initWrapper(nodes);
-    for (int i=0; text[i] != '\0'; i++) {
-        int key = (int) text[i];
+    for (size_t i=0; i < text->length; i++) {
+        int key = (int) text->str[i];
         int letterIndex = intMapGet(letterToIndex, key);
         if (letterIndex == -1) {
-            char letter = text[i];
-            addLetter(wrapper, letter);
+            addLetter(wrapper, (char) key);
             intMapInsert(letterToIndex, key, wrapper->currentSize-1);
         } else {
             incrementLetter(wrapper, letterIndex);
@@ -262,21 +261,28 @@ char* decode(StringToIntMap* codeDictionary, char* code) {
     return decoded;
 }
 
-size_t readFile(const char* filename, char* bufor) {
+
+long getFileSize(FILE* file)
+{
+    fseek(file, 0L, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    return size;
+}
+
+string* readFile(const char* filename) {
     FILE* file = fopen(filename, "rb");
-    if (file != NULL) {
-        size_t bufor_idx = 0;
-        do
-        {
-            char c = fgetc(file);
-            if (feof(file)) break;
-            bufor[bufor_idx++] = c;
-            // if exceed buffor index
-        } while(1);
-        fclose(file);
-        return bufor_idx;
+    if (file == NULL) {
+        return NULL;
     }
-    return 0;
+    long fileSize = getFileSize(file);
+    if (fileSize == -1) {
+        return NULL;
+    }
+    string* buffer = newEmptyStringWithFixedLength((size_t) fileSize);
+    fread(buffer->str, sizeof(char), fileSize, file);
+    fclose(file);
+    return buffer;
 }
 
 size_t roundUp(size_t length) {
@@ -294,19 +300,17 @@ void writeFile(const char* filename, string* content) {
                 codeInBytes[i / 8] |= 1 << (7 - (i % 8));
             }
         }
-        printf("compressed bytes: %zu\n", roundUp(content->length));
         fwrite(codeInBytes, sizeof(char), roundedLength, newFile);
         fclose(newFile);
     }
 }
 
-char* readByBits(char* compressedFileContent, size_t contentLength) {
-    char* decompressed = (char*) malloc(contentLength * 8 * sizeof(char) + 1);
-    printf("rezerwuje %zu\n", contentLength * sizeof(char));
+char* readByBits(string* content) {
+    char* decompressed = (char*) malloc(content->length * 8 * sizeof(char) + 1);
     size_t decompressedSize = 0;
-    for (size_t i = 0; i < contentLength;  i++) {
+    for (size_t i = 0; i < content->length;  i++) {
         for (size_t j = 0; j < 8; j++) {
-           decompressed[decompressedSize++] = '0' + ((compressedFileContent[i] >> (7-j)) & 1); 
+           decompressed[decompressedSize++] = '0' + ((content->str[i] >> (7-j)) & 1); 
         }
     }
     decompressed[decompressedSize] = '\0';
@@ -315,31 +319,23 @@ char* readByBits(char* compressedFileContent, size_t contentLength) {
 
 int main() {
     // STEP 1 compression
-    char bufor[4096];
-    readFile(FILENAME_TO_COMPRESS, bufor);
-    string* fileContent = newString(bufor);
-    printf("oryginal length: %zu\n", fileContent->length);
+    string* fileContent = readFile(FILENAME_TO_COMPRESS);
     if (fileContent == NULL) {
         return 0;
     }
-    NodeWrapper* wrapper = countLetters(fileContent->str);
+    NodeWrapper* wrapper = countLetters(fileContent);
 
     qsort(wrapper->nodes, wrapper->currentSize, sizeof(Node), compareNodes);
 
     IntToStringMap* codeDictionary = getCodesDictionary(wrapper);
     string* code = getCode(fileContent, codeDictionary);
-    printf("code->length %zu\n", code->length);
     writeFile(COMPRESSED_FILENAME, code);
     // STEP 2 DECOMPRESSION
-    char compressedCode[32768];
-    size_t compressedLength = readFile(COMPRESSED_FILENAME, compressedCode);
-    printf("compressedLength %zu\n", compressedLength);
-    char* decompressedCode = readByBits(compressedCode, compressedLength);
+    string* compressedCode = readFile(COMPRESSED_FILENAME);
+    char* decompressedCode = readByBits(compressedCode);
     decompressedCode[code->length] = '\0';
-    printf("After decompression");
     StringToIntMap* invertedMap = invertMap(codeDictionary);
     char* text = decode(invertedMap, decompressedCode);
-    printf("after decoding: %s\n", text);
 
     freeStringToIntMap(invertedMap);
     freeString(code);

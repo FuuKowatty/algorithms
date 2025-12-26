@@ -36,4 +36,6 @@ string **split(string *str, const char delimeter, size_t *count);
 
 int compareChar(string *str1, char *str2);
 
+string* newEmptyStringWithFixedLength(size_t fixedSize);
+
 #endif
