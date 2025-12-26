@@ -338,11 +338,15 @@ int main() {
     char* text = decode(invertedMap, decompressedCode);
 
     freeStringToIntMap(invertedMap);
+    freeString(fileContent);
+    freeString(compressedCode);
     freeString(code);
     free(decompressedCode);
     freeIntToStringMap(codeDictionary);
     freeWrapper(wrapper);
     free(text);
+
+    return 0;
 };
 
 // notatki z tego co mam + jak czyscimy pointery (ze wskazujemy zawsze na 1 adres bo robi -16 zeby odczytac metadane)
