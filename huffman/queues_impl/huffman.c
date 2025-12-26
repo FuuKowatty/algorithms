@@ -8,7 +8,7 @@
 
 // CONSTS
 #define POTENTIAL_CODE_MAX 31
-const char* FILENAME_TO_COMPRESS = "dupa.txt";
+const char* FILENAME_TO_COMPRESS = "file.txt";
 const char* COMPRESSED_FILENAME = "newFIle";
 const size_t NODE_INITIAL_SIZE = 10;
 const char EMPTY_LETTER = '[';
@@ -209,10 +209,10 @@ IntToStringMap* getCodesDictionary(NodeWrapper* wrapper) {
     return dictionaryCodes;
 }
 
-string* getCode(char* text, IntToStringMap* codeDictionary) {
+string* getCode(string* text, IntToStringMap* codeDictionary) {
     string* code = newString("");
-    for (int i = 0; text[i] != '\0'; i++) {
-        string* letterCode = IntToStringMapGet(codeDictionary, (int) text[i]);
+    for (size_t i = 0; i < text->length; i++) {
+        string* letterCode = IntToStringMapGet(codeDictionary, (int) text->str[i]);
         string* temp = concat(code, letterCode);
         freeString(code);
         code = temp;
@@ -271,8 +271,9 @@ size_t readFile(const char* filename, char* bufor) {
             char c = fgetc(file);
             if (feof(file)) break;
             bufor[bufor_idx++] = c;
+            // if exceed buffor index
         } while(1);
-        fclose(file);   
+        fclose(file);
         return bufor_idx;
     }
     return 0;
@@ -293,13 +294,15 @@ void writeFile(const char* filename, string* content) {
                 codeInBytes[i / 8] |= 1 << (7 - (i % 8));
             }
         }
+        printf("compressed bytes: %zu\n", roundUp(content->length));
         fwrite(codeInBytes, sizeof(char), roundedLength, newFile);
         fclose(newFile);
     }
 }
 
-char* readByBits(const char* compressedFileContent, size_t contentLength, size_t charMaxSize) {
-    char* decompressed = (char*) malloc(charMaxSize * sizeof(char));
+char* readByBits(char* compressedFileContent, size_t contentLength) {
+    char* decompressed = (char*) malloc(contentLength * 8 * sizeof(char) + 1);
+    printf("rezerwuje %zu\n", contentLength * sizeof(char));
     size_t decompressedSize = 0;
     for (size_t i = 0; i < contentLength;  i++) {
         for (size_t j = 0; j < 8; j++) {
@@ -312,26 +315,33 @@ char* readByBits(const char* compressedFileContent, size_t contentLength, size_t
 
 int main() {
     // STEP 1 compression
-    char fileContent[4096]; // change it to count length
-    size_t contentLength = readFile(FILENAME_TO_COMPRESS, fileContent);
-    NodeWrapper* wrapper = countLetters(fileContent);
+    char bufor[4096];
+    readFile(FILENAME_TO_COMPRESS, bufor);
+    string* fileContent = newString(bufor);
+    printf("oryginal length: %zu\n", fileContent->length);
+    if (fileContent == NULL) {
+        return 0;
+    }
+    NodeWrapper* wrapper = countLetters(fileContent->str);
 
     qsort(wrapper->nodes, wrapper->currentSize, sizeof(Node), compareNodes);
 
     IntToStringMap* codeDictionary = getCodesDictionary(wrapper);
     string* code = getCode(fileContent, codeDictionary);
-
+    printf("code->length %zu\n", code->length);
     writeFile(COMPRESSED_FILENAME, code);
     // STEP 2 DECOMPRESSION
-    char compressedFileContent[4096];
-    size_t ile = readFile(COMPRESSED_FILENAME, compressedFileContent);
-    char* decompressedCode = readByBits(compressedFileContent, contentLength, 4096);
+    char compressedCode[32768];
+    size_t compressedLength = readFile(COMPRESSED_FILENAME, compressedCode);
+    printf("compressedLength %zu\n", compressedLength);
+    char* decompressedCode = readByBits(compressedCode, compressedLength);
     decompressedCode[code->length] = '\0';
-
+    printf("After decompression");
     StringToIntMap* invertedMap = invertMap(codeDictionary);
     char* text = decode(invertedMap, decompressedCode);
-    freeStringToIntMap(invertedMap);
+    printf("after decoding: %s\n", text);
 
+    freeStringToIntMap(invertedMap);
     freeString(code);
     free(decompressedCode);
     freeIntToStringMap(codeDictionary);
