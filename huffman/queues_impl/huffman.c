@@ -201,7 +201,7 @@ IntToStringMap* getCodesDictionary(NodeWrapper* wrapper) {
         Node* e3 = createNode(e1, e2);
         pushQueue(q2, e3);
     }
-    IntToStringMap* dictionaryCodes = newIntToStringMap(99, 0.75);
+    IntToStringMap* dictionaryCodes = newIntToStringMap(99, 0.5);
     processCodes(q2, dictionaryCodes);
     free(q1);
     clearHuffmanQueue(q2);
@@ -220,7 +220,7 @@ string* getCode(string* text, IntToStringMap* codeDictionary) {
 }
 
 StringToIntMap* invertMap(IntToStringMap* dict) {
-    StringToIntMap* newMap = newStringToIntMap(dict->size, 1);
+    StringToIntMap* newMap = newStringToIntMap(dict->size, 0.5);
     for (size_t i = 0; i < dict->size; i++) {
         IntToStringMapEntry entry = dict->entries[i];
         if (entry.isOccupied) {
@@ -237,6 +237,7 @@ string* cleanString(string* code) {
 
 char* decode(StringToIntMap* codeDictionary, char* code) {
     size_t codeLen = strlen(code);
+    printf("codeLen %zu\n", codeLen);
     char* decoded = malloc(codeLen + 1);
     size_t decodedIdx = 0;
     char potentialCode[POTENTIAL_CODE_MAX];
@@ -253,7 +254,7 @@ char* decode(StringToIntMap* codeDictionary, char* code) {
             potentialLen = 0;
         }
         if (potentialLen >= POTENTIAL_CODE_MAX) {
-            printf("ERROR: EXCEED POTENTIAL_CODE_MAX");
+            printf("ERROR: EXCEED POTENTIAL_CODE_MAX\n");
             return decoded;
         }
     }
@@ -270,14 +271,20 @@ long getFileSize(FILE* file)
     return size;
 }
 
-string* readFile(const char* filename) {
+string* readFile(const char* filename, long offset) {
     FILE* file = fopen(filename, "rb");
     if (file == NULL) {
         return NULL;
     }
     long fileSize = getFileSize(file);
+    printf("filen sizen '%ld'\n", fileSize);
+    printf("offset '%ld'\n", offset);
     if (fileSize == -1) {
         return NULL;
+    }
+    if (offset != 0) {
+        fseek(file, offset, SEEK_SET);
+        fileSize -= offset;
     }
     string* buffer = newEmptyStringWithFixedLength((size_t) fileSize);
     fread(buffer->str, sizeof(char), fileSize, file);
@@ -289,21 +296,20 @@ size_t roundUp(size_t length) {
     return (length + 7) / 8;
 }
 
-void writeFile(const char* filename, string* content) {
-    FILE* newFile = fopen(filename, "wb");
-    if (newFile != NULL) {
-        size_t codeLength = content->length; 
-        size_t roundedLength = roundUp(codeLength);
-        char* codeInBytes = calloc(roundedLength, 1);
-        for (size_t i = 0; i < codeLength; i++) {
-            if (content->str[i] == '1') {
-                codeInBytes[i / 8] |= 1 << (7 - (i % 8));
-            }
+string* compressToBits(string* content) {
+    size_t codeLength = content->length;
+    size_t roundedLength = roundUp(codeLength);
+    char* codeInBits = calloc(roundedLength, 1);
+    for (size_t i = 0; i < codeLength; i++) {
+        if (content->str[i] == '1') {
+            codeInBits[i / 8] |= 1 << (7 - (i % 8));
         }
-        fwrite(codeInBytes, sizeof(char), roundedLength, newFile);
-        fclose(newFile);
     }
-}
+    string* result = newEmptyStringWithFixedLength(roundedLength);
+    memcpy(result->str, codeInBits, roundedLength);
+    free(codeInBits);
+    return result;
+};
 
 char* readByBits(string* content) {
     char* decompressed = (char*) malloc(content->length * 8 * sizeof(char) + 1);
@@ -314,12 +320,50 @@ char* readByBits(string* content) {
         }
     }
     decompressed[decompressedSize] = '\0';
+    printf("sizen2 %zu\n", decompressedSize);
     return decompressed;
+}
+
+void compressToFile(const char* filename, StringToIntMap* fileMetadata, string* code) {
+    FILE* newFile = fopen(filename, "wb");
+    if (newFile == NULL) {
+        return;
+    }
+    fwrite(&code->length, sizeof(size_t), 1, newFile);
+    string* serializedMetadata = serializeMap(fileMetadata, EMPTY_LETTER);
+    fwrite(&serializedMetadata->length, sizeof(size_t), 1, newFile);
+    fwrite(serializedMetadata->str, sizeof(char), serializedMetadata->length, newFile);
+    string* codeInBytes = compressToBits(code);
+    fwrite(codeInBytes->str, sizeof(char), codeInBytes->length, newFile);
+    fclose(newFile);
+    freeString(serializedMetadata);
+}
+
+char* decompressFile(const char* filename) {
+    FILE* file = fopen(filename, "rb");
+    if (file == NULL) {
+        return 0;
+    }
+    size_t codeLength = readSizeT(file);
+    printf("codeLength: %zu\n", codeLength);
+    StringToIntMap* map = deserializeMap(file, EMPTY_LETTER);
+    printf("teilen '%ld'\n", ftell(file));
+    string* compressedCode = readFile(COMPRESSED_FILENAME, ftell(file)-1);
+    printf("compressedCode %s\n", compressedCode->str);
+    fclose(file);
+    char* decompressedCode = readByBits(compressedCode);
+    freeString(compressedCode);
+    printf("codeLength2: %zu\n", codeLength);
+    decompressedCode[codeLength] = '\0';
+    char* text = decode(map, decompressedCode);
+    freeStringToIntMap(map);
+    free(decompressedCode); 
+    return text;
 }
 
 int main() {
     // STEP 1 compression
-    string* fileContent = readFile(FILENAME_TO_COMPRESS);
+    string* fileContent = readFile(FILENAME_TO_COMPRESS, 0);
     if (fileContent == NULL) {
         return 0;
     }
@@ -329,25 +373,19 @@ int main() {
 
     IntToStringMap* codeDictionary = getCodesDictionary(wrapper);
     string* code = getCode(fileContent, codeDictionary);
-    writeFile(COMPRESSED_FILENAME, code);
-    // STEP 2 DECOMPRESSION
-    string* compressedCode = readFile(COMPRESSED_FILENAME);
-    char* decompressedCode = readByBits(compressedCode);
-    decompressedCode[code->length] = '\0';
+    
     StringToIntMap* invertedMap = invertMap(codeDictionary);
-    char* text = decode(invertedMap, decompressedCode);
 
+    compressToFile(COMPRESSED_FILENAME, invertedMap, code);
+    freeWrapper(wrapper);
+    freeIntToStringMap(codeDictionary);
     freeStringToIntMap(invertedMap);
     freeString(fileContent);
-    freeString(compressedCode);
     freeString(code);
-    free(decompressedCode);
-    freeIntToStringMap(codeDictionary);
-    freeWrapper(wrapper);
-    free(text);
+    // STEP 2 DECOMPRESSION
+    char* text = decompressFile(COMPRESSED_FILENAME);
+    printf("%s\n", text);
 
+    free(text);
     return 0;
 };
-
-// notatki z tego co mam + jak czyscimy pointery (ze wskazujemy zawsze na 1 adres bo robi -16 zeby odczytac metadane)
-// implementacja z LinkedList

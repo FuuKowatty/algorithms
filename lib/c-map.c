@@ -106,67 +106,47 @@ void freeIntMap(IntMap *map) {
 }
 
 void resizeStringToIntMap(StringToIntMap *map) {
-    size_t newSize = map->size * 2;
+    size_t oldSize = map->size;
+    size_t newSize = oldSize * 2;
     StringToIntMapEntry *newEntries = (StringToIntMapEntry*) malloc(newSize * sizeof(StringToIntMapEntry));
     if (newEntries == NULL) {
         return;
     }
-
     for (size_t i = 0; i < newSize; i++) {
-        newEntries->isOccupied = 0;
+        newEntries[i].isOccupied = 0;
     }
-
-    for (size_t i = 0; i < map->size; i++) {
-        if (map->entries[i].isOccupied) {
-            string *key = map->entries[i].key;
-            int value = map->entries[i].value;
-            size_t hash = hashFunction(stringToInt(key), newSize);
-            size_t attempt = 0;
-            size_t index = quadraticProbe(hash, attempt, newSize);
-            while (newEntries[index].isOccupied) {
-                attempt += 1;
-            }
-            newEntries[index].key = key;
-            newEntries[index].value = value;
-            newEntries[index].isOccupied = 1;
-        }
-    }
-
-    free(map->entries);
+    StringToIntMapEntry *entries = map->entries;
     map->entries = newEntries;
     map->size = newSize;
+    map->count = 0;
+    for (size_t i = 0; i < oldSize; i++) {
+        if (entries[i].isOccupied) {
+            StringToIntMapInsert(map, entries[i].key, entries[i].value);
+        }
+    }
+    free(entries);
 }
 
 void resizeIntToStringMap(IntToStringMap *map) {
-    size_t newSize = map->size * 2;
+    size_t oldSize = map->size;
+    size_t newSize = oldSize * 2;
     IntToStringMapEntry *newEntries = (IntToStringMapEntry*) malloc(newSize * sizeof(IntToStringMapEntry));
     if (newEntries == NULL) {
         return;
     }
-
     for (size_t i = 0; i < newSize; i++) {
-        newEntries->isOccupied = 0;
+        newEntries[i].isOccupied = 0;
     }
-
-    for (size_t i = 0; i < map->size; i++) {
-        if (map->entries[i].isOccupied) {
-            int key = map->entries[i].key;
-            string *value = map->entries[i].value;
-            size_t hash = hashFunction(key, newSize);
-            size_t attempt = 0;
-            size_t index = quadraticProbe(hash, attempt, newSize);
-            while (newEntries[index].isOccupied) {
-                attempt += 1;
-            }
-            newEntries[index].key = key;
-            newEntries[index].value = value;
-            newEntries[index].isOccupied = 1;
-        }
-    }
-
-    free(map->entries);
+    IntToStringMapEntry *entries = map->entries;
     map->entries = newEntries;
     map->size = newSize;
+    map->count = 0;
+    for (size_t i = 0; i < oldSize; i++) {
+        if (entries[i].isOccupied) {
+            IntToStringMapInsert(map, entries[i].key, entries[i].value);
+        }
+    }
+    free(entries);
 }
 
 void resizeIntMap(IntMap *map) {
@@ -373,3 +353,62 @@ void intMapDelete(IntMap *map, int key) {
         index = quadraticProbe(hash, attempt, map->size);
     }
 }
+
+size_t countHowMuchAllocate(StringToIntMap *map) {
+    size_t size = sizeof(char);
+    for(size_t i = 0; i < map->size; i++) {
+        if (map->entries[i].isOccupied) {
+            size += map->entries[i].key->length + 1 + 1; 
+        }
+    }
+    return size;
+}
+
+string* serializeMap(StringToIntMap *map, char separator) {
+    string* entries = newEmptyStringWithFixedLength(countHowMuchAllocate(map));
+    size_t entriesSize = 0;
+    entries->str[entriesSize++] = map->count;
+    for(size_t i = 0; i < map->size; i++) {
+        if (map->entries[i].isOccupied) {
+            entries->str[entriesSize++] = map->entries[i].value;
+            for(size_t j = 0; j < map->entries[i].key->length; j++) {
+                entries->str[entriesSize++] = map->entries[i].key->str[j];
+            }
+            entries->str[entriesSize++] = separator;
+        }
+    }
+    entries->str[entriesSize] = '\0';
+    return entries;
+}
+
+size_t readSizeT(FILE* file) {
+    size_t el;
+    fread(&el, sizeof(size_t), 1, file);
+    return el;
+}
+
+StringToIntMap* deserializeMap(FILE* file, char separator) {
+    size_t mapByteLength = readSizeT(file);
+    char* mapContent = malloc(mapByteLength+1);
+    fread(mapContent, sizeof(char), mapByteLength+1, file);
+    mapContent[mapByteLength+1] = '\0';
+    size_t mapCount = (size_t) mapContent[0];
+    StringToIntMap* map = newStringToIntMap(mapCount, 0.5);
+    size_t mapContentIndex = 1;
+    for (size_t i = 1; i < mapByteLength; i++) {
+        if (mapContent[i] == separator) {
+            char value = mapContent[mapContentIndex];
+            string* key = newEmptyStringWithFixedLength(i - mapContentIndex - sizeof(char));
+            mapContentIndex++;
+            size_t keyIndex = 0;
+            while (mapContentIndex < i) {
+                key->str[keyIndex++] = mapContent[mapContentIndex];
+                mapContentIndex++; 
+            }
+            key->str[keyIndex] = '\0';
+            mapContentIndex++;
+            StringToIntMapInsert(map, key, value);
+        }
+    }
+    return map;
+} 

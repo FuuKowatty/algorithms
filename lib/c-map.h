@@ -87,4 +87,10 @@ void intMapDelete(IntMap *map, int key);
 
 int StringToIntMapGetRaw(StringToIntMap *map, char *key);
 
+string* serializeMap(StringToIntMap *map, char separator);
+
+StringToIntMap* deserializeMap(FILE* file, char separator);
+
+size_t readSizeT(FILE* file);
+
 #endif

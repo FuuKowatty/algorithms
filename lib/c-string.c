@@ -12,7 +12,7 @@ string* newEmptyStringWithFixedLength(size_t fixedSize) {
         free(newStr);
         return NULL;
     }
-    newStr->str[newStr->length] = '\0';
+    newStr->str[newStr->length + 1] = '\0';
     return newStr;
 }
 
@@ -283,7 +283,6 @@ string **split(string *str, const char delimeter, size_t *count) {
     if (splitArray == NULL) {
         return NULL;
     }
-
     size_t start = 0;
     size_t arrayIndex = 0;
     size_t bufferIndex = 0;
