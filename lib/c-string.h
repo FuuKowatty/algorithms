@@ -38,4 +38,6 @@ int compareChar(string *str1, char *str2);
 
 string* newEmptyStringWithFixedLength(size_t fixedSize);
 
+void ensureStringLength(string* s, size_t actualLength);
+
 #endif

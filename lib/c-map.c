@@ -194,7 +194,6 @@ void StringToIntMapInsert(StringToIntMap *map, string *key, int value) {
         attempt++;
         index = quadraticProbe(hash, attempt, map->size);
     }
-    
     map->entries[index].key = key;
     map->entries[index].value = value;
     map->entries[index].isOccupied = 1;
@@ -358,7 +357,7 @@ size_t countHowMuchAllocate(StringToIntMap *map) {
     size_t size = sizeof(char);
     for(size_t i = 0; i < map->size; i++) {
         if (map->entries[i].isOccupied) {
-            size += map->entries[i].key->length + 1 + 1; 
+            size += map->entries[i].key->length + 1 + sizeof(char); // code + letter + separator
         }
     }
     return size;
@@ -393,11 +392,22 @@ StringToIntMap* deserializeMap(FILE* file, char separator) {
     fread(mapContent, sizeof(char), mapByteLength+1, file);
     mapContent[mapByteLength+1] = '\0';
     size_t mapCount = (size_t) mapContent[0];
-    StringToIntMap* map = newStringToIntMap(mapCount, 0.5);
+    if (mapCount == 0) {
+        mapCount = 256; // we cant have map->count = 0 and max count is 256 so it is only possible option
+    }
+    StringToIntMap* map = newStringToIntMap(mapCount*2, 1);
     size_t mapContentIndex = 1;
+    char shouldSkipNext = 'n';
     for (size_t i = 1; i < mapByteLength; i++) {
+        if (shouldSkipNext == 'y') {
+            shouldSkipNext = 'n';
+            continue;
+        }
         if (mapContent[i] == separator) {
-            char value = mapContent[mapContentIndex];
+            if (i+1 != mapByteLength && mapContent[i+1] == separator) {
+                shouldSkipNext = 'y';
+            }
+            unsigned char value = mapContent[mapContentIndex];
             string* key = newEmptyStringWithFixedLength(i - mapContentIndex - sizeof(char));
             mapContentIndex++;
             size_t keyIndex = 0;
@@ -411,4 +421,4 @@ StringToIntMap* deserializeMap(FILE* file, char separator) {
         }
     }
     return map;
-} 
+}

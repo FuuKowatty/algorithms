@@ -12,7 +12,7 @@ string* newEmptyStringWithFixedLength(size_t fixedSize) {
         free(newStr);
         return NULL;
     }
-    newStr->str[newStr->length + 1] = '\0';
+    newStr->str[newStr->length] = '\0';
     return newStr;
 }
 
@@ -319,4 +319,16 @@ string **split(string *str, const char delimeter, size_t *count) {
 
     *count = delimeterCount + 1;
     return splitArray;
+}
+
+void ensureStringLength(string* s, size_t actualLength) {
+    if (s->length == actualLength) {
+        size_t newLength = s->length * 5;
+        char* temp = realloc(s->str, newLength+1);
+        if (temp == NULL) {
+            return;
+        }
+        s->str = temp;
+        s->length = newLength+1;
+    }
 }

@@ -8,10 +8,11 @@
 
 // CONSTS
 #define POTENTIAL_CODE_MAX 31
-const char* FILENAME_TO_COMPRESS = "file.txt";
+const size_t DEFAULT_FIXED_LENGTH_STR = 2048;
+const char* FILENAME_TO_COMPRESS = "list motywacyjny.pdf";
 const char* COMPRESSED_FILENAME = "compressed";
-const size_t NODE_INITIAL_SIZE = 10;
-const char EMPTY_LETTER = '[';
+const size_t NODE_INITIAL_SIZE = 256;
+const unsigned char SEPARATOR_CHAR = ',';  
 
 int compareNodes(const void *a, const void *b) {
     const Node* arg1 = (const Node*)a;
@@ -47,11 +48,11 @@ void ensureWrapperSize(NodeWrapper* wrapper) {
     }
 }
 
-void addLetter(NodeWrapper* wrapper, char letter) {
+void addLetter(NodeWrapper* wrapper, unsigned char letter, size_t count) {
     ensureWrapperSize(wrapper);
     Node* node = &wrapper->nodes[wrapper->currentSize];
     wrapper->currentSize += 1;
-    node->count = 1;
+    node->count = count;
     node->letter = letter;
     node->codeName = NULL;
     node->children = NULL;
@@ -63,20 +64,19 @@ void incrementLetter(NodeWrapper* wrapper, int letterIndex) {
 }
 
 NodeWrapper* countLetters(string* text) {
-    IntMap* letterToIndex = newIntMap(99, 0.75);
+    unsigned char letters[256] = {0};
+    for (size_t i=0; i < text->length; i++) {
+        unsigned char letterIdx = text->str[i]; // musze dawac unsigned bo przy rzutowaniu do unsigned int najpierw rzutuje mi do int'a wiec jak bedzie minusowa liczba to mi totalnie zle to odczyta
+        letters[(unsigned int) letterIdx] += 1;
+    }
     Node* nodes = initNodes(NODE_INITIAL_SIZE);
     NodeWrapper* wrapper = initWrapper(nodes);
-    for (size_t i=0; i < text->length; i++) {
-        int key = (int) text->str[i];
-        int letterIndex = intMapGet(letterToIndex, key);
-        if (letterIndex == -1) {
-            addLetter(wrapper, (char) key);
-            intMapInsert(letterToIndex, key, wrapper->currentSize-1);
-        } else {
-            incrementLetter(wrapper, letterIndex);
+    for (int i = 0; i < 256; i++) {
+        unsigned char letterCount = letters[i];
+        if (letters[i] > 0) {
+            addLetter(wrapper, i, letterCount);
         }
     }
-    freeIntMap(letterToIndex);
     return wrapper;
 }
  
@@ -126,7 +126,6 @@ Node* createNode(Node* e1, Node* e2) {
     children[1] = e2;
     Node* newNode = (Node*) malloc(sizeof(Node));
     newNode->count=e1->count + e2->count;
-    newNode->letter = EMPTY_LETTER;
     newNode->children = children;
     newNode->codeName = NULL;
     return newNode;
@@ -201,7 +200,7 @@ IntToStringMap* getCodesDictionary(NodeWrapper* wrapper) {
         Node* e3 = createNode(e1, e2);
         pushQueue(q2, e3);
     }
-    IntToStringMap* dictionaryCodes = newIntToStringMap(99, 0.5);
+    IntToStringMap* dictionaryCodes = newIntToStringMap(512, 0.5);
     processCodes(q2, dictionaryCodes);
     free(q1);
     clearHuffmanQueue(q2);
@@ -209,13 +208,21 @@ IntToStringMap* getCodesDictionary(NodeWrapper* wrapper) {
 }
 
 string* getCode(string* text, IntToStringMap* codeDictionary) {
-    string* code = newString("");
+    string* code = newEmptyStringWithFixedLength(DEFAULT_FIXED_LENGTH_STR);
+    size_t actualLength = 0;
     for (size_t i = 0; i < text->length; i++) {
-        string* letterCode = IntToStringMapGet(codeDictionary, (int) text->str[i]);
-        string* temp = concat(code, letterCode);
-        freeString(code);
-        code = temp;
+        string* letterCode = IntToStringMapGet(codeDictionary, (unsigned char) text->str[i]);
+        for (size_t i = 0; i < letterCode->length; i++) {
+            ensureStringLength(code, actualLength);
+            if (actualLength >= code->length) {
+                printf("OVERFLOW! actualLength=%zu, length=%zu\n", actualLength, code->length);
+                exit(1);
+            }
+            code->str[actualLength++] = letterCode->str[i];
+        }
     }
+    code->str[actualLength] = '\0';
+    code->length=actualLength;
     return code;
 }
 
@@ -331,7 +338,7 @@ void compressToFile(const char* filename, StringToIntMap* fileMetadata, string* 
         return;
     }
     fwrite(&code->length, sizeof(size_t), 1, newFile);
-    string* serializedMetadata = serializeMap(fileMetadata, EMPTY_LETTER);
+    string* serializedMetadata = serializeMap(fileMetadata, SEPARATOR_CHAR);
     fwrite(&serializedMetadata->length, sizeof(size_t), 1, newFile);
     fwrite(serializedMetadata->str, sizeof(char), serializedMetadata->length, newFile);
     string* codeInBytes = compressToBits(code);
@@ -346,7 +353,7 @@ string* decompressFile(const char* filename) {
         return 0;
     }
     size_t codeLength = readSizeT(file);
-    StringToIntMap* map = deserializeMap(file, EMPTY_LETTER);
+    StringToIntMap* map = deserializeMap(file, SEPARATOR_CHAR);
     string* compressedCode = readFile(COMPRESSED_FILENAME, ftell(file)-1);
     fclose(file);
     char* decompressedCode = readByBits(compressedCode);
@@ -378,7 +385,6 @@ int main() {
 
     IntToStringMap* codeDictionary = getCodesDictionary(wrapper);
     string* code = getCode(fileContent, codeDictionary);
-    
     StringToIntMap* invertedMap = invertMap(codeDictionary);
 
     compressToFile(COMPRESSED_FILENAME, invertedMap, code);

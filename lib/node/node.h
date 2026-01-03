@@ -6,7 +6,7 @@ typedef struct Node
 {
     struct Node** children;
     string* codeName;
-    char letter;
+    unsigned char letter;
     size_t count;
 } Node;
 
