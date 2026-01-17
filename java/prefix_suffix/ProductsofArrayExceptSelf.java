@@ -1,5 +1,3 @@
-import java.util.Arrays;
-
 // https://neetcode.io/problems/products-of-array-discluding-self/history
 public class ProductsofArrayExceptSelf {
     public static void main(String[] args) {
